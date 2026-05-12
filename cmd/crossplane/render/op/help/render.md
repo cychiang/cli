@@ -30,6 +30,14 @@ to the Docker daemon. See the [Docker environment
 variables](https://docs.docker.com/engine/reference/commandline/cli/#environment-variables)
 reference.
 
+## Project support
+
+When running `render` in a Crossplane Project (any directory containing a
+`crossplane-project.yaml` project metadata file), it is optional to provide the
+functions file as an argument. If the functions file is omitted, function
+dependencies defined in the project metadata will be used. Embedded functions
+from the project will also be built and run by render.
+
 ## Examples
 
 Render an Operation:
