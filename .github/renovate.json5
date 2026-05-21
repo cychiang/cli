@@ -14,7 +14,7 @@
   // PLEASE UPDATE THIS WHEN RELEASING.
   baseBranches: [
     'main',
-    '/^release-.*/',
+    'release-2.3',
   ],
   ignorePaths: [],
   postUpdateOptions: [
