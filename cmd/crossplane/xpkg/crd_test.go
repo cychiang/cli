@@ -23,6 +23,7 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/google/go-cmp/cmp"
+	"github.com/invopop/jsonschema"
 	"github.com/spf13/afero"
 	extv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,24 +31,36 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
 )
 
+const schemaTypeObject = "object"
+
 var testCRD = &extv1.CustomResourceDefinition{
+	TypeMeta: metav1.TypeMeta{
+		APIVersion: "apiextensions.k8s.io/v1",
+		Kind:       "CustomResourceDefinition",
+	},
 	ObjectMeta: metav1.ObjectMeta{
 		Name: "tests.example.org",
 	},
 	Spec: extv1.CustomResourceDefinitionSpec{
 		Group: "example.org",
 		Names: extv1.CustomResourceDefinitionNames{
-			Kind: "Test",
+			Kind:     "Test",
+			Plural:   "tests",
+			Singular: "test",
+			ListKind: "TestList",
 		},
+		Scope: extv1.NamespaceScoped,
 		Versions: []extv1.CustomResourceDefinitionVersion{
 			{
-				Name: "v1alpha1",
+				Name:    "v1alpha1",
+				Served:  true,
+				Storage: true,
 				Schema: &extv1.CustomResourceValidation{
 					OpenAPIV3Schema: &extv1.JSONSchemaProps{
-						Type: "object",
+						Type: schemaTypeObject,
 						Properties: map[string]extv1.JSONSchemaProps{
 							"spec": {
-								Type: "object",
+								Type: schemaTypeObject,
 								Properties: map[string]extv1.JSONSchemaProps{
 									"replicas": {
 										Type: "integer",
@@ -62,106 +75,10 @@ var testCRD = &extv1.CustomResourceDefinition{
 	},
 }
 
-func TestOpenAPIToJSONSchema(t *testing.T) {
-	type args struct {
-		props   *extv1.JSONSchemaProps
-		group   string
-		version string
-		kind    string
-	}
-
-	type want struct {
-		schema map[string]any
-		err    error
-	}
-
-	cases := map[string]struct {
-		reason string
-		args   args
-		want   want
-	}{
-		"BasicSchema": {
-			reason: "Should convert a basic OpenAPI schema to JSON Schema with correct metadata",
-			args: args{
-				props: &extv1.JSONSchemaProps{
-					Type: "object",
-					Properties: map[string]extv1.JSONSchemaProps{
-						"replicas": {
-							Type: "integer",
-						},
-					},
-				},
-				group:   "example.org",
-				version: "v1alpha1",
-				kind:    "Test",
-			},
-			want: want{
-				schema: map[string]any{
-					"$schema": jsonSchemaDraft07,
-					"$id":     "example.org/v1alpha1/test.json",
-					"type":    "object",
-					"properties": map[string]any{
-						"replicas": map[string]any{
-							"type": "integer",
-						},
-					},
-					"x-kubernetes-group-version-kind": []map[string]string{
-						{
-							"group":   "example.org",
-							"version": "v1alpha1",
-							"kind":    "Test",
-						},
-					},
-				},
-			},
-		},
-		"EmptySchema": {
-			reason: "Should handle an empty schema with only type",
-			args: args{
-				props:   &extv1.JSONSchemaProps{Type: "object"},
-				group:   "test.io",
-				version: "v1",
-				kind:    "Foo",
-			},
-			want: want{
-				schema: map[string]any{
-					"$schema": jsonSchemaDraft07,
-					"$id":     "test.io/v1/foo.json",
-					"type":    "object",
-					"x-kubernetes-group-version-kind": []map[string]string{
-						{
-							"group":   "test.io",
-							"version": "v1",
-							"kind":    "Foo",
-						},
-					},
-				},
-			},
-		},
-	}
-
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			got, err := openAPIToJSONSchema(tc.args.props, tc.args.group, tc.args.version, tc.args.kind)
-
-			if diff := cmp.Diff(tc.want.err, err, test.EquateErrors()); diff != "" {
-				t.Errorf("%s\nopenAPIToJSONSchema(...): -want error, +got error:\n%s", tc.reason, diff)
-			}
-
-			// Compare via JSON to normalize types (float64 vs int, etc.)
-			wantJSON, _ := json.Marshal(tc.want.schema)
-			gotJSON, _ := json.Marshal(got)
-
-			if diff := cmp.Diff(string(wantJSON), string(gotJSON)); diff != "" {
-				t.Errorf("%s\nopenAPIToJSONSchema(...): -want, +got:\n%s", tc.reason, diff)
-			}
-		})
-	}
-}
-
 func TestWriteCRDs(t *testing.T) {
 	type args struct {
 		crds      []*extv1.CustomResourceDefinition
+		flat      bool
 		outputDir string
 	}
 
@@ -175,10 +92,21 @@ func TestWriteCRDs(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"SingleCRD": {
-			reason: "Should write a single CRD as a YAML file",
+		"Structured": {
+			reason: "Should write CRDs organized by group and storage version",
 			args: args{
 				crds:      []*extv1.CustomResourceDefinition{testCRD},
+				outputDir: "/out",
+			},
+			want: want{
+				files: []string{"/out/example.org/v1alpha1/test.yaml"},
+			},
+		},
+		"Flat": {
+			reason: "Should write CRDs as flat files when --flat is set",
+			args: args{
+				crds:      []*extv1.CustomResourceDefinition{testCRD},
+				flat:      true,
 				outputDir: "/out",
 			},
 			want: want{
@@ -186,7 +114,7 @@ func TestWriteCRDs(t *testing.T) {
 			},
 		},
 		"MultipleCRDs": {
-			reason: "Should write multiple CRDs as separate YAML files",
+			reason: "Should write multiple CRDs organized by group and version",
 			args: args{
 				crds: []*extv1.CustomResourceDefinition{
 					testCRD,
@@ -195,6 +123,9 @@ func TestWriteCRDs(t *testing.T) {
 						Spec: extv1.CustomResourceDefinitionSpec{
 							Group: "example.org",
 							Names: extv1.CustomResourceDefinitionNames{Kind: "Foo"},
+							Versions: []extv1.CustomResourceDefinitionVersion{
+								{Name: "v1beta1", Storage: true},
+							},
 						},
 					},
 				},
@@ -202,8 +133,8 @@ func TestWriteCRDs(t *testing.T) {
 			},
 			want: want{
 				files: []string{
-					"/out/tests.example.org.yaml",
-					"/out/foos.example.org.yaml",
+					"/out/example.org/v1alpha1/test.yaml",
+					"/out/example.org/v1beta1/foo.yaml",
 				},
 			},
 		},
@@ -222,7 +153,6 @@ func TestWriteCRDs(t *testing.T) {
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {
 			fs := afero.NewMemMapFs()
-			_ = fs.MkdirAll(tc.args.outputDir, 0o755)
 
 			buf := &bytes.Buffer{}
 			app, err := kong.New(&struct{}{})
@@ -237,6 +167,7 @@ func TestWriteCRDs(t *testing.T) {
 
 			c := &crdCmd{
 				OutputDir: tc.args.outputDir,
+				Flat:      tc.args.flat,
 				fs:        fs,
 			}
 
@@ -259,6 +190,7 @@ func TestWriteCRDs(t *testing.T) {
 func TestWriteJSONSchemas(t *testing.T) {
 	type args struct {
 		crds      []*extv1.CustomResourceDefinition
+		flat      bool
 		outputDir string
 	}
 
@@ -272,14 +204,25 @@ func TestWriteJSONSchemas(t *testing.T) {
 		args   args
 		want   want
 	}{
-		"SingleVersion": {
-			reason: "Should write a JSON Schema file for a single version CRD",
+		"Structured": {
+			reason: "Should write JSON Schema files organized by group and version",
 			args: args{
 				crds:      []*extv1.CustomResourceDefinition{testCRD},
 				outputDir: "/schemas",
 			},
 			want: want{
 				files: []string{"/schemas/example.org/v1alpha1/test.json"},
+			},
+		},
+		"Flat": {
+			reason: "Should write JSON Schema files as flat files when --flat is set",
+			args: args{
+				crds:      []*extv1.CustomResourceDefinition{testCRD},
+				flat:      true,
+				outputDir: "/schemas",
+			},
+			want: want{
+				files: []string{"/schemas/example.org_v1alpha1_test.json"},
 			},
 		},
 		"NoSchema": {
@@ -322,6 +265,7 @@ func TestWriteJSONSchemas(t *testing.T) {
 
 			c := &crdCmd{
 				OutputDir: tc.args.outputDir,
+				Flat:      tc.args.flat,
 				fs:        fs,
 			}
 
@@ -338,13 +282,9 @@ func TestWriteJSONSchemas(t *testing.T) {
 				}
 
 				data, _ := afero.ReadFile(fs, f)
-				var schema map[string]any
+				var schema jsonschema.Schema
 				if err := json.Unmarshal(data, &schema); err != nil {
-					t.Errorf("%s\nwriteJSONSchemas(...): file %s is not valid JSON: %v", tc.reason, f, err)
-				}
-
-				if schema["$schema"] != jsonSchemaDraft07 {
-					t.Errorf("%s\nwriteJSONSchemas(...): file %s missing $schema field", tc.reason, f)
+					t.Errorf("%s\nwriteJSONSchemas(...): file %s is not valid JSON Schema: %v", tc.reason, f, err)
 				}
 			}
 		})

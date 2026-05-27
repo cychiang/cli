@@ -33,12 +33,10 @@ import (
 
 	"github.com/crossplane/cli/v2/cmd/crossplane/common/load"
 	"github.com/crossplane/cli/v2/cmd/crossplane/validate"
+	"github.com/crossplane/cli/v2/internal/schemas/generator"
 )
 
-const (
-	errWriteOutput    = "cannot write output"
-	jsonSchemaDraft07 = "http://json-schema.org/draft-07/schema#"
-)
+const errWriteOutput = "cannot write output"
 
 // Cmd arguments and flags for the crd subcommand.
 type crdCmd struct {
@@ -49,6 +47,7 @@ type crdCmd struct {
 	CacheDir        string `default:"~/.crossplane/cache"                                                                help:"Absolute path to the cache directory where downloaded schemas are stored."                predictor:"directory"`
 	CleanCache      bool   `help:"Clean the cache directory before downloading package schemas."`
 	CrossplaneImage string `help:"Specify the Crossplane image to be used for fetching the built-in schemas."`
+	Flat            bool   `help:"Write files to a flat directory instead of organizing by group and version."`
 	JSONSchema      bool   `help:"Write JSON Schema files instead of CRDs. Useful for YAML language server integration." name:"json-schema"`
 	NoCache         bool   `help:"Disable caching entirely. Schemas are downloaded every time and not stored."`
 	OutputDir       string `default:"."                                                                                  help:"Directory where CRD or JSON Schema files will be written. Defaults to current directory." name:"output-dir"     short:"o"`
@@ -64,16 +63,19 @@ This command downloads CRDs from Crossplane package dependencies (providers, fun
 them as YAML files to the specified output directory. With --json-schema, it extracts the OpenAPI v3 schemas from
 CRDs and writes them as JSON Schema files suitable for use with YAML language servers.
 
+By default, files are organized by API group and version (e.g., <group>/<version>/<kind>.{yaml|json} for CRDs
+or JSON schemas). Use --flat to not create subfolders and write all files directly to the output directory.
+
 It accepts the same extension sources as the validate command: crossplane.yaml files, directories containing package
 manifests, or Provider/Function/Configuration resources.
 
 Examples:
 
-  # Download CRDs from a crossplane.yaml to the current directory
-  crossplane xpkg crd crossplane.yaml
-
-  # Download CRDs to a specific directory
+  # Download CRDs organized by group
   crossplane xpkg crd crossplane.yaml --output-dir ./crds
+
+  # Download CRDs as flat files
+  crossplane xpkg crd crossplane.yaml --output-dir ./crds --flat
 
   # Download JSON Schemas for YAML language server
   crossplane xpkg crd crossplane.yaml --output-dir ./schemas --json-schema
@@ -145,6 +147,8 @@ func (c *crdCmd) Run(k *kong.Context, _ logging.Logger) error {
 }
 
 // writeCRDs marshals each CRD to YAML and writes it to the output directory.
+// By default, files are organized by group and version. With --flat, files are
+// written directly to the output directory using the CRD name.
 func (c *crdCmd) writeCRDs(k *kong.Context, crds []*extv1.CustomResourceDefinition) error {
 	for _, crd := range crds {
 		data, err := yaml.Marshal(crd)
@@ -152,8 +156,11 @@ func (c *crdCmd) writeCRDs(k *kong.Context, crds []*extv1.CustomResourceDefiniti
 			return errors.Wrapf(err, "cannot marshal CRD %q", crd.GetName())
 		}
 
-		filename := crd.GetName() + ".yaml"
-		outPath := filepath.Join(c.OutputDir, filename)
+		outPath := c.outputPath(crd.GetName(), crd.Spec.Group, storageVersion(crd), crd.Spec.Names.Kind, ".yaml")
+
+		if err := c.fs.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+			return errors.Wrapf(err, "cannot create directory for %q", outPath)
+		}
 
 		if err := afero.WriteFile(c.fs, outPath, data, 0o644); err != nil {
 			return errors.Wrapf(err, "cannot write CRD to %q", outPath)
@@ -171,8 +178,32 @@ func (c *crdCmd) writeCRDs(k *kong.Context, crds []*extv1.CustomResourceDefiniti
 	return nil
 }
 
+func storageVersion(crd *extv1.CustomResourceDefinition) string {
+	for _, v := range crd.Spec.Versions {
+		if v.Storage {
+			return v.Name
+		}
+	}
+	if len(crd.Spec.Versions) > 0 {
+		return crd.Spec.Versions[0].Name
+	}
+	return ""
+}
+
+// outputPath returns the file path for a resource. flatName is used as the
+// filename in --flat mode. In structured mode, files are organized by group
+// and version.
+func (c *crdCmd) outputPath(flatName, group, version, kind, ext string) string {
+	if c.Flat {
+		return filepath.Join(c.OutputDir, flatName+ext)
+	}
+	return filepath.Join(c.OutputDir, group, version, strings.ToLower(kind)+ext)
+}
+
 // writeJSONSchemas extracts OpenAPI v3 schemas from CRD versions and writes
-// them as JSON Schema files organized by group and version.
+// them as JSON Schema files organized by group and version. It applies the
+// shared schema mutations from internal/schemas/generator for YAML language
+// server compatibility (additionalProperties: false on object types, etc.).
 func (c *crdCmd) writeJSONSchemas(k *kong.Context, crds []*extv1.CustomResourceDefinition) error {
 	count := 0
 
@@ -185,7 +216,7 @@ func (c *crdCmd) writeJSONSchemas(k *kong.Context, crds []*extv1.CustomResourceD
 				continue
 			}
 
-			schema, err := openAPIToJSONSchema(ver.Schema.OpenAPIV3Schema, group, ver.Name, kind)
+			schema, err := generator.ToJSONSchema(ver.Schema.OpenAPIV3Schema, group, ver.Name, kind)
 			if err != nil {
 				return errors.Wrapf(err, "cannot convert schema for %s/%s %s", group, ver.Name, kind)
 			}
@@ -195,13 +226,12 @@ func (c *crdCmd) writeJSONSchemas(k *kong.Context, crds []*extv1.CustomResourceD
 				return errors.Wrapf(err, "cannot marshal JSON Schema for %s/%s %s", group, ver.Name, kind)
 			}
 
-			dir := filepath.Join(c.OutputDir, group, ver.Name)
-			if err := c.fs.MkdirAll(dir, 0o755); err != nil {
-				return errors.Wrapf(err, "cannot create directory %q", dir)
-			}
+			flatName := fmt.Sprintf("%s_%s_%s", group, ver.Name, strings.ToLower(kind))
+			outPath := c.outputPath(flatName, group, ver.Name, kind, ".json")
 
-			filename := strings.ToLower(kind) + ".json"
-			outPath := filepath.Join(dir, filename)
+			if err := c.fs.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
+				return errors.Wrapf(err, "cannot create directory for %q", outPath)
+			}
 
 			if err := afero.WriteFile(c.fs, outPath, data, 0o644); err != nil {
 				return errors.Wrapf(err, "cannot write JSON Schema to %q", outPath)
@@ -220,30 +250,4 @@ func (c *crdCmd) writeJSONSchemas(k *kong.Context, crds []*extv1.CustomResourceD
 	}
 
 	return nil
-}
-
-// openAPIToJSONSchema converts an OpenAPI v3 schema to a JSON Schema draft-07
-// document with Kubernetes group-version-kind metadata.
-func openAPIToJSONSchema(props *extv1.JSONSchemaProps, group, version, kind string) (map[string]any, error) {
-	raw, err := json.Marshal(props)
-	if err != nil {
-		return nil, errors.Wrap(err, "cannot marshal OpenAPI schema")
-	}
-
-	schema := map[string]any{}
-	if err := json.Unmarshal(raw, &schema); err != nil {
-		return nil, errors.Wrap(err, "cannot unmarshal OpenAPI schema")
-	}
-
-	schema["$schema"] = jsonSchemaDraft07
-	schema["$id"] = fmt.Sprintf("%s/%s/%s.json", group, version, strings.ToLower(kind))
-	schema["x-kubernetes-group-version-kind"] = []map[string]string{
-		{
-			"group":   group,
-			"version": version,
-			"kind":    kind,
-		},
-	}
-
-	return schema, nil
 }
