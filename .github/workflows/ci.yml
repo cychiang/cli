@@ -213,3 +213,8 @@ jobs:
           fail_on_error: true
           reporter: local
           filter_mode: nofilter
+
+      - name: Show generated docs on failure
+        if: ${{ failure() }}
+        run: |
+          cat ./docs/content/master/cli/command-reference.md
