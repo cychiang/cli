@@ -39,13 +39,13 @@ import (
 	_ "embed"
 )
 
-//go:embed help/extract-crds.md
-var helpExtractCRDs string
+//go:embed help/get-crds.md
+var helpGetCRDs string
 
 const errWriteOutput = "cannot write output"
 
-// Cmd arguments and flags for the extract-crds subcommand.
-type extractCRDsCmd struct {
+// Cmd arguments and flags for the get-crds subcommand.
+type getCRDsCmd struct {
 	// Arguments.
 	Extensions string `arg:"" help:"Extension sources as a comma-separated list of files, directories, or '-' for standard input."`
 
@@ -62,19 +62,19 @@ type extractCRDsCmd struct {
 	fs afero.Fs
 }
 
-// Help prints out the help for the extract-crds command.
-func (c *extractCRDsCmd) Help() string {
-	return helpExtractCRDs
+// Help prints out the help for the get-crds command.
+func (c *getCRDsCmd) Help() string {
+	return helpGetCRDs
 }
 
 // AfterApply implements kong.AfterApply.
-func (c *extractCRDsCmd) AfterApply() error {
+func (c *getCRDsCmd) AfterApply() error {
 	c.fs = afero.NewOsFs()
 	return nil
 }
 
 // Run downloads CRDs from package dependencies and writes them to the output directory.
-func (c *extractCRDsCmd) Run(k *kong.Context, _ logging.Logger) error {
+func (c *getCRDsCmd) Run(k *kong.Context, _ logging.Logger) error {
 	extensionLoader, err := load.NewLoader(c.Extensions)
 	if err != nil {
 		return errors.Wrapf(err, "cannot load extensions from %q", c.Extensions)
@@ -128,7 +128,7 @@ func (c *extractCRDsCmd) Run(k *kong.Context, _ logging.Logger) error {
 // writeCRDs marshals each CRD to YAML and writes it to the output directory.
 // By default, files are organized by group and version. With --flat, files are
 // written directly to the output directory using the CRD name.
-func (c *extractCRDsCmd) writeCRDs(k *kong.Context, crds []*extv1.CustomResourceDefinition) error {
+func (c *getCRDsCmd) writeCRDs(k *kong.Context, crds []*extv1.CustomResourceDefinition) error {
 	for _, crd := range crds {
 		data, err := yaml.Marshal(crd)
 		if err != nil {
@@ -172,7 +172,7 @@ func storageVersion(crd *extv1.CustomResourceDefinition) string {
 // outputPath returns the file path for a resource. flatName is used as the
 // filename in --flat mode. In structured mode, files are organized by group
 // and version.
-func (c *extractCRDsCmd) outputPath(flatName, group, version, kind, ext string) string {
+func (c *getCRDsCmd) outputPath(flatName, group, version, kind, ext string) string {
 	if c.Flat {
 		return filepath.Join(c.OutputDir, flatName+ext)
 	}
@@ -183,7 +183,7 @@ func (c *extractCRDsCmd) outputPath(flatName, group, version, kind, ext string) 
 // them as JSON Schema files organized by group and version. It applies the
 // shared schema mutations from internal/schemas/generator for YAML language
 // server compatibility (additionalProperties: false on object types, etc.).
-func (c *extractCRDsCmd) writeJSONSchemas(k *kong.Context, crds []*extv1.CustomResourceDefinition) error {
+func (c *getCRDsCmd) writeJSONSchemas(k *kong.Context, crds []*extv1.CustomResourceDefinition) error {
 	count := 0
 
 	for _, crd := range crds {

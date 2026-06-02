@@ -165,7 +165,7 @@ func TestWriteCRDs(t *testing.T) {
 			}
 			k.Stdout = buf
 
-			c := &extractCRDsCmd{
+			c := &getCRDsCmd{
 				OutputDir: tc.args.outputDir,
 				Flat:      tc.args.flat,
 				fs:        fs,
@@ -263,7 +263,7 @@ func TestWriteJSONSchemas(t *testing.T) {
 			}
 			k.Stdout = buf
 
-			c := &extractCRDsCmd{
+			c := &getCRDsCmd{
 				OutputDir: tc.args.outputDir,
 				Flat:      tc.args.flat,
 				fs:        fs,

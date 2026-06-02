@@ -1,4 +1,4 @@
-The `xpkg extract-crds` command downloads CRDs from Crossplane package
+The `xpkg get-crds` command downloads CRDs from Crossplane package
 dependencies (providers, functions, configurations) and writes them as YAML
 files to the specified output directory. With `--json-schema`, it extracts the
 OpenAPI v3 schemas from CRDs and writes them as JSON Schema files suitable for
@@ -17,29 +17,29 @@ Provider/Function/Configuration resources.
 Download CRDs organized by group:
 
 ```shell
-crossplane xpkg extract-crds crossplane.yaml --output-dir ./crds
+crossplane xpkg get-crds crossplane.yaml --output-dir ./crds
 ```
 
 Download CRDs as flat files:
 
 ```shell
-crossplane xpkg extract-crds crossplane.yaml --output-dir ./crds --flat
+crossplane xpkg get-crds crossplane.yaml --output-dir ./crds --flat
 ```
 
 Download JSON Schemas for YAML language server:
 
 ```shell
-crossplane xpkg extract-crds crossplane.yaml --output-dir ./schemas --json-schema
+crossplane xpkg get-crds crossplane.yaml --output-dir ./schemas --json-schema
 ```
 
 Download CRDs from multiple sources:
 
 ```shell
-crossplane xpkg extract-crds crossplane.yaml,providers/ --output-dir ./crds
+crossplane xpkg get-crds crossplane.yaml,providers/ --output-dir ./crds
 ```
 
 Force re-download of cached schemas:
 
 ```shell
-crossplane xpkg extract-crds crossplane.yaml --output-dir ./crds --clean-cache
+crossplane xpkg get-crds crossplane.yaml --output-dir ./crds --clean-cache
 ```
