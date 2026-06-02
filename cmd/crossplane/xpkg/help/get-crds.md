@@ -14,32 +14,32 @@ Provider/Function/Configuration resources.
 
 ## Examples
 
-Download CRDs organized by group:
+- Download CRDs organized by group:
 
-```shell
-crossplane xpkg get-crds crossplane.yaml --output-dir ./crds
-```
+    ```shell
+    crossplane xpkg get-crds crossplane.yaml --output-dir ./crds
+    ```
 
-Download CRDs as flat files:
+- Download CRDs as flat files:
 
-```shell
-crossplane xpkg get-crds crossplane.yaml --output-dir ./crds --flat
-```
+    ```shell
+    crossplane xpkg get-crds crossplane.yaml --output-dir ./crds --flat
+    ```
 
-Download JSON Schemas for YAML language server:
+- Download JSON Schemas for YAML language server:
 
 ```shell
 crossplane xpkg get-crds crossplane.yaml --output-dir ./schemas --json-schema
 ```
 
-Download CRDs from multiple sources:
+- Download CRDs from multiple sources:
 
-```shell
-crossplane xpkg get-crds crossplane.yaml,providers/ --output-dir ./crds
-```
+    ```shell
+    crossplane xpkg get-crds crossplane.yaml,providers/ --output-dir ./crds
+    ```
 
-Force re-download of cached schemas:
+- Force re-download of cached schemas:
 
-```shell
-crossplane xpkg get-crds crossplane.yaml --output-dir ./crds --clean-cache
-```
+    ```shell
+    crossplane xpkg get-crds crossplane.yaml --output-dir ./crds --clean-cache
+    ```
