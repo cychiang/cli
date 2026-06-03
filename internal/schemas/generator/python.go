@@ -47,7 +47,7 @@ const (
 	pythonPackageRoot          = "models"
 	pythonAdoptModelsStructure = "sorted"
 	pythonGeneratedFolder      = "models/workdir"
-	pythonImage                = "docker.io/koxudaxi/datamodel-code-generator:0.31.2"
+	pythonImage                = "docker.io/koxudaxi/datamodel-code-generator:0.59.0"
 )
 
 var importRE = regexp.MustCompile(`^(from\s+)(\.*)([^\s]+)(.*)`)
@@ -542,19 +542,6 @@ func processOpenAPIContent(doc *openapi3.T) *openapi3.T { //nolint:gocognit // s
 	return doc
 }
 
-func fixAliasedTypesInFile(fs afero.Fs, filePath string) error {
-	fileContent, err := afero.ReadFile(fs, filePath)
-	if err != nil {
-		return errors.Wrapf(err, "reading file %s", filePath)
-	}
-
-	content := string(fileContent)
-	content = strings.ReplaceAll(content, "bool_aliased", "bool")
-	content = strings.ReplaceAll(content, "int_aliased", "int")
-
-	return afero.WriteFile(fs, filePath, []byte(content), os.ModePerm)
-}
-
 func postTransformOpenAPI(fs afero.Fs, sourceDir, targetDir string) error {
 	createdInitDirs := make(map[string]bool)
 
@@ -587,8 +574,8 @@ func postTransformOpenAPI(fs afero.Fs, sourceDir, targetDir string) error {
 			return err
 		}
 
-		if err := postProcessFile(fs, destPath); err != nil {
-			return err
+		if err := adjustImportsInFile(fs, destPath); err != nil {
+			return errors.Wrapf(err, "adjusting imports")
 		}
 
 		return transformMetaImportsInFile(fs, destPath)
@@ -677,13 +664,6 @@ func copyFileWithInit(fs afero.Fs, srcPath, destPath, destDir string, created ma
 	}
 
 	return nil
-}
-
-func postProcessFile(fs afero.Fs, path string) error {
-	if err := adjustImportsInFile(fs, path); err != nil {
-		return errors.Wrapf(err, "adjusting imports")
-	}
-	return errors.Wrapf(fixAliasedTypesInFile(fs, path), "fixing aliased types")
 }
 
 func isMetaV1File(path string) bool {
