@@ -83,13 +83,18 @@ func (e *dockerRenderEngine) CheckContextSupport() error {
 // containers also join it. The returned cleanup function removes the
 // network.
 func (e *dockerRenderEngine) Setup(ctx context.Context, fns []pkgv1.Function) (func(), error) {
-	networkID, networkName, err := createRenderNetwork(ctx)
-	if err != nil {
-		return func() {}, errors.Wrap(err, "cannot create Docker network for rendering")
-	}
+	var networkID, networkName string
 
-	e.network = networkName
-	injectNetworkAnnotation(fns, networkName)
+	if e.network == "" {
+		var err error
+		networkID, networkName, err = createRenderNetwork(ctx)
+		if err != nil {
+			return func() {}, errors.Wrap(err, "cannot create Docker network for rendering")
+		}
+		e.network = networkName
+
+		injectNetworkAnnotation(fns, networkName)
+	}
 
 	cleanup := func() { //nolint:contextcheck // Detached context for cleanup.
 		_ = removeRenderNetwork(context.Background(), networkID)

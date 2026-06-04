@@ -61,17 +61,18 @@ type EngineFlags struct {
 	CrossplaneVersion string `help:"Version of the Crossplane image to use for rendering. Defaults to the latest stable version." placeholder:"VERSION" xor:"crossplane-selector"`
 	CrossplaneImage   string `help:"Override the full Crossplane Docker image reference for rendering."                           placeholder:"IMAGE"   xor:"crossplane-selector"`
 	CrossplaneBinary  string `help:"Path to a local crossplane binary to use instead of Docker."                                  placeholder:"PATH"    type:"existingfile"       xor:"crossplane-selector"`
+	Network           string `help:"The network containers should connect to"`
 }
 
 // NewEngineFromFlags creates an Engine from the flag configuration. If a binary
 // path is set, it returns a local engine. Otherwise it returns a Docker engine
 // using the resolved image reference.
-func NewEngineFromFlags(f *EngineFlags, log logging.Logger) Engine {
+func NewEngineFromFlags(f *EngineFlags, network string, log logging.Logger) Engine {
 	if f.CrossplaneBinary != "" {
 		return &localRenderEngine{BinaryPath: f.CrossplaneBinary}
 	}
 
-	return &dockerRenderEngine{image: crossplaneImageFromFlags(f), log: log}
+	return &dockerRenderEngine{image: crossplaneImageFromFlags(f), network: network, log: log}
 }
 
 func crossplaneImageFromFlags(f *EngineFlags) string {

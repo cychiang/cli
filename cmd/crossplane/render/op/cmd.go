@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/alecthomas/kong"
@@ -84,7 +85,7 @@ type Cmd struct {
 	fs afero.Fs
 
 	// newEngine constructs the render Engine.
-	newEngine func(*render.EngineFlags, logging.Logger) render.Engine
+	newEngine func(*render.EngineFlags, string, logging.Logger) render.Engine
 }
 
 // Help prints out the help for the alpha render op command.
@@ -167,7 +168,20 @@ func (c *Cmd) Run(k *kong.Context, log logging.Logger, sp terminal.SpinnerPrinte
 		}
 	}
 
-	engine := c.newEngine(&c.EngineFlags, log)
+	network := ""
+	for _, annotation := range c.FunctionAnnotations {
+		parts := strings.SplitN(annotation, "=", 2)
+		if len(parts) != 2 {
+			return errors.Errorf("invalid function annotation format %q, expected key=value", annotation)
+		}
+		key, value := parts[0], parts[1]
+		if key == render.AnnotationKeyRuntimeDockerNetwork {
+			network = value
+			break
+		}
+	}
+
+	engine := c.newEngine(&c.EngineFlags, network, log)
 
 	seedCtx := len(c.ContextValues) > 0 || len(c.ContextFiles) > 0
 	captureCtx := c.IncludeContext
