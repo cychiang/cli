@@ -20,10 +20,12 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"maps"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/alecthomas/kong"
@@ -69,7 +71,13 @@ type initCmd struct {
 
 func (c *initCmd) Help() string {
 	b := strings.Builder{}
-	for name, url := range WellKnownTemplates() {
+
+	// Sort the map keys to ensure stable help output.
+	tmpls := WellKnownTemplates()
+	names := slices.Sorted(maps.Keys(tmpls))
+
+	for _, name := range names {
+		url := tmpls[name]
 		fmt.Fprintf(&b, "- `%s` ([%s](%s))\n", name, url, url)
 	}
 
