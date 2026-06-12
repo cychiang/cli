@@ -38,8 +38,9 @@ const projectFileName = "crossplane-project.yaml"
 
 // initCmd initializes a new project.
 type initCmd struct {
-	Name      string `arg:""                                                    help:"The name of the new project."`
-	Directory string `help:"Directory to initialize. Defaults to project name." short:"d"                           type:"path"`
+	Name       string `arg:""                       help:"The name of the new project."`
+	Directory  string `arg:""                       help:"Directory to initialize. Defaults to project name." optional:"" short:"d" type:"path"`
+	Repository string `default:"example.com/my-org" help:"Override the repository in the project file."       optional:""`
 }
 
 func (c *initCmd) Help() string {
@@ -73,8 +74,8 @@ kind: Project
 metadata:
   name: %s
 spec:
-  repository: example.com/my-org/%s
-`, c.Name, c.Name)
+  repository: %s/%s
+`, c.Name, c.Repository, c.Name)
 
 		if err := os.WriteFile(projFile, []byte(content), 0o600); err != nil {
 			return errors.Wrapf(err, "failed to write %s", projectFileName)
