@@ -2,6 +2,7 @@ package render
 
 import "strings"
 
+// Annotations is a type used to store annotations.
 type Annotations map[string]string
 
 // NewAnnotationsFromStrings parses an array of strings in the format "key=value" into a map.
