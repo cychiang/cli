@@ -72,7 +72,7 @@ type Cmd struct {
 	IncludeContext         bool              `help:"Include the context in the rendered output as a resource of kind: Context."                                                                short:"c"`
 	IncludeFullOperation   bool              `help:"Include a direct copy of the input Operation's spec and metadata fields in the rendered output."                                           short:"o"`
 	IncludeFunctionResults bool              `help:"Include informational and warning messages from functions in the rendered output as resources of kind: Result."                            short:"r"`
-	RequiredResources      string            `help:"A YAML file or directory of YAML files specifying required resources to pass to the function pipeline."                                    placeholder:"PATH"      predictor:"yaml_file_or_directory" short:"e"   type:"path"`
+	RequiredResources      []string          `help:"A YAML file or directory of YAML files specifying required resources to pass to the function pipeline. Provide multiple files by repeating the argument." placeholder:"PATH" predictor:"yaml_file_or_directory" short:"e" type:"path"`
 	RequiredSchemas        string            `help:"A directory of JSON files specifying OpenAPI schemas to pass to the function pipeline."                                                    placeholder:"DIR"       predictor:"directory"              type:"path"`
 	WatchedResource        string            `help:"A YAML file specifying the watched resource for WatchOperation rendering. The resource is also added to required resources."               placeholder:"PATH"      predictor:"yaml_file"              short:"w"   type:"existingfile"`
 
@@ -113,11 +113,12 @@ func (c *Cmd) Run(k *kong.Context, log logging.Logger, sp terminal.SpinnerPrinte
 
 	// Load required resources
 	rrs := []unstructured.Unstructured{}
-	if c.RequiredResources != "" {
-		rrs, err = render.LoadRequiredResources(c.fs, c.RequiredResources)
+	for _, path := range c.RequiredResources {
+		loaded, err := render.LoadRequiredResources(c.fs, path)
 		if err != nil {
-			return errors.Wrapf(err, "cannot load required resources from %q", c.RequiredResources)
+			return errors.Wrapf(err, "cannot load required resources from %q", path)
 		}
+		rrs = append(rrs, loaded...)
 	}
 
 	// Load required schemas
