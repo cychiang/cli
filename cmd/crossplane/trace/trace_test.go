@@ -3,6 +3,7 @@ package trace
 import (
 	"testing"
 
+	"github.com/alecthomas/kong"
 	"github.com/google/go-cmp/cmp"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
@@ -101,5 +102,25 @@ func TestCmd_getResourceAndName(t *testing.T) {
 				t.Errorf("Cmd.getResourceAndName() name = %v, want %v", gotName, tt.want.name)
 			}
 		})
+	}
+}
+
+func TestImpersonationFlagsParse(t *testing.T) {
+	var c Cmd
+
+	p, err := kong.New(&c)
+	if err != nil {
+		t.Fatalf("kong.New(): unexpected error: %v", err)
+	}
+
+	if _, err := p.Parse([]string{"--as=jane", "--as-group=team-a", "configuration.example.org"}); err != nil {
+		t.Fatalf("Parse(): unexpected error: %v", err)
+	}
+
+	if c.Impersonation.As != "jane" {
+		t.Errorf("As: want %q, got %q", "jane", c.Impersonation.As)
+	}
+	if len(c.Impersonation.AsGroup) != 1 || c.Impersonation.AsGroup[0] != "team-a" {
+		t.Errorf("AsGroup: want [team-a], got %v", c.Impersonation.AsGroup)
 	}
 }
