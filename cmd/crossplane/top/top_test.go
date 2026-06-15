@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alecthomas/kong"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +16,23 @@ import (
 
 	v1 "github.com/crossplane/crossplane/apis/v2/pkg/v1"
 )
+
+func TestImpersonationFlagsParse(t *testing.T) {
+	var c Cmd
+
+	p, err := kong.New(&c)
+	if err != nil {
+		t.Fatalf("kong.New(): unexpected error: %v", err)
+	}
+
+	if _, err := p.Parse([]string{"--as=system:serviceaccount:team-a:reader"}); err != nil {
+		t.Fatalf("Parse(): unexpected error: %v", err)
+	}
+
+	if c.Impersonation.As != "system:serviceaccount:team-a:reader" {
+		t.Errorf("As: want service account, got %q", c.Impersonation.As)
+	}
+}
 
 type errorWriter struct{}
 

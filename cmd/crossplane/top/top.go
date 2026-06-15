@@ -36,6 +36,8 @@ import (
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/logging"
 
+	"github.com/crossplane/cli/v2/cmd/crossplane/common/kube"
+
 	_ "embed"
 )
 
@@ -58,6 +60,8 @@ const (
 type Cmd struct {
 	Summary   bool   `help:"Adds summary header for all Crossplane pods." name:"summary"                                                             short:"s"`
 	Namespace string `default:"crossplane-system"                         help:"Show pods from a specific namespace, defaults to crossplane-system." name:"namespace" predictor:"namespace" short:"n"`
+
+	Impersonation kube.ImpersonationFlags `embed:""`
 }
 
 // Help returns help instructions for the top command.
@@ -102,6 +106,8 @@ func (c *Cmd) Run(k *kong.Context, logger logging.Logger) error {
 	if err != nil {
 		return errors.Wrap(err, errKubeConfig)
 	}
+
+	c.Impersonation.Apply(config)
 
 	logger.Debug("Found kubeconfig")
 
