@@ -20,38 +20,83 @@ import (
 	"testing"
 
 	"github.com/alecthomas/kong"
+	"github.com/google/go-cmp/cmp"
+
+	"github.com/crossplane/cli/v2/cmd/crossplane/common/kube"
 )
 
 func TestInstallImpersonationFlagsParse(t *testing.T) {
-	var c installCmd
-
-	p, err := kong.New(&c)
-	if err != nil {
-		t.Fatalf("kong.New(): unexpected error: %v", err)
+	cases := map[string]struct {
+		reason string
+		args   []string
+		want   kube.ImpersonationFlags
+	}{
+		"None": {
+			reason: "Without impersonation flags the fields should be empty.",
+			args:   []string{"provider", "example.org/provider-foo:v1.0.0"},
+			want:   kube.ImpersonationFlags{},
+		},
+		"Group": {
+			reason: "--as-group should populate the embedded flags.",
+			args:   []string{"--as-group=team-a-admins", "provider", "example.org/provider-foo:v1.0.0"},
+			want:   kube.ImpersonationFlags{AsGroup: []string{"team-a-admins"}},
+		},
 	}
 
-	if _, err := p.Parse([]string{"--as-group=team-a-admins", "provider", "example.org/provider-foo:v1.0.0"}); err != nil {
-		t.Fatalf("Parse(): unexpected error: %v", err)
-	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			var c installCmd
 
-	if len(c.Impersonation.AsGroup) != 1 || c.Impersonation.AsGroup[0] != "team-a-admins" {
-		t.Errorf("AsGroup: want [team-a-admins], got %v", c.Impersonation.AsGroup)
+			p, err := kong.New(&c)
+			if err != nil {
+				t.Fatalf("%s\nkong.New(): unexpected error: %v", tc.reason, err)
+			}
+
+			if _, err := p.Parse(tc.args); err != nil {
+				t.Fatalf("%s\nParse(%v): unexpected error: %v", tc.reason, tc.args, err)
+			}
+
+			if diff := cmp.Diff(tc.want, c.Impersonation); diff != "" {
+				t.Errorf("%s\nParse(%v): -want, +got:\n%s", tc.reason, tc.args, diff)
+			}
+		})
 	}
 }
 
 func TestUpdateImpersonationFlagsParse(t *testing.T) {
-	var c updateCmd
-
-	p, err := kong.New(&c)
-	if err != nil {
-		t.Fatalf("kong.New(): unexpected error: %v", err)
+	cases := map[string]struct {
+		reason string
+		args   []string
+		want   kube.ImpersonationFlags
+	}{
+		"None": {
+			reason: "Without impersonation flags the fields should be empty.",
+			args:   []string{"provider", "example.org/provider-foo:v1.0.1"},
+			want:   kube.ImpersonationFlags{},
+		},
+		"User": {
+			reason: "--as should populate the embedded flags.",
+			args:   []string{"--as=jane", "provider", "example.org/provider-foo:v1.0.1"},
+			want:   kube.ImpersonationFlags{As: "jane"},
+		},
 	}
 
-	if _, err := p.Parse([]string{"--as=jane", "provider", "example.org/provider-foo:v1.0.1"}); err != nil {
-		t.Fatalf("Parse(): unexpected error: %v", err)
-	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			var c updateCmd
 
-	if c.Impersonation.As != "jane" {
-		t.Errorf("As: want %q, got %q", "jane", c.Impersonation.As)
+			p, err := kong.New(&c)
+			if err != nil {
+				t.Fatalf("%s\nkong.New(): unexpected error: %v", tc.reason, err)
+			}
+
+			if _, err := p.Parse(tc.args); err != nil {
+				t.Fatalf("%s\nParse(%v): unexpected error: %v", tc.reason, tc.args, err)
+			}
+
+			if diff := cmp.Diff(tc.want, c.Impersonation); diff != "" {
+				t.Errorf("%s\nParse(%v): -want, +got:\n%s", tc.reason, tc.args, diff)
+			}
+		})
 	}
 }

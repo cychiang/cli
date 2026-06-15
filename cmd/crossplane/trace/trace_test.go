@@ -8,6 +8,8 @@ import (
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
 	"github.com/crossplane/crossplane-runtime/v2/pkg/test"
+
+	"github.com/crossplane/cli/v2/cmd/crossplane/common/kube"
 )
 
 func TestCmd_getResourceAndName(t *testing.T) {
@@ -106,21 +108,39 @@ func TestCmd_getResourceAndName(t *testing.T) {
 }
 
 func TestImpersonationFlagsParse(t *testing.T) {
-	var c Cmd
-
-	p, err := kong.New(&c)
-	if err != nil {
-		t.Fatalf("kong.New(): unexpected error: %v", err)
+	cases := map[string]struct {
+		reason string
+		args   []string
+		want   kube.ImpersonationFlags
+	}{
+		"None": {
+			reason: "Without impersonation flags the fields should be empty.",
+			args:   []string{"configuration.example.org"},
+			want:   kube.ImpersonationFlags{},
+		},
+		"UserAndGroup": {
+			reason: "--as and --as-group should populate the embedded flags.",
+			args:   []string{"--as=jane", "--as-group=team-a", "configuration.example.org"},
+			want:   kube.ImpersonationFlags{As: "jane", AsGroup: []string{"team-a"}},
+		},
 	}
 
-	if _, err := p.Parse([]string{"--as=jane", "--as-group=team-a", "configuration.example.org"}); err != nil {
-		t.Fatalf("Parse(): unexpected error: %v", err)
-	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			var c Cmd
 
-	if c.Impersonation.As != "jane" {
-		t.Errorf("As: want %q, got %q", "jane", c.Impersonation.As)
-	}
-	if len(c.Impersonation.AsGroup) != 1 || c.Impersonation.AsGroup[0] != "team-a" {
-		t.Errorf("AsGroup: want [team-a], got %v", c.Impersonation.AsGroup)
+			p, err := kong.New(&c)
+			if err != nil {
+				t.Fatalf("%s\nkong.New(): unexpected error: %v", tc.reason, err)
+			}
+
+			if _, err := p.Parse(tc.args); err != nil {
+				t.Fatalf("%s\nParse(%v): unexpected error: %v", tc.reason, tc.args, err)
+			}
+
+			if diff := cmp.Diff(tc.want, c.Impersonation); diff != "" {
+				t.Errorf("%s\nParse(%v): -want, +got:\n%s", tc.reason, tc.args, diff)
+			}
+		})
 	}
 }
