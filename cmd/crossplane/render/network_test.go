@@ -57,8 +57,8 @@ func TestSetDefaultCrossplaneDockerNetwork(t *testing.T) {
 			},
 			want: want{},
 		},
-		"NoFunctions": {
-			reason: "Rendering with no functions should not create a Docker network.",
+		"NoFunctionsPreservesDefaultBehavior": {
+			reason: "No functions should leave CrossplaneDockerNetwork unset so engine setup can use its default temporary network behavior.",
 			want:   want{},
 		},
 	}
