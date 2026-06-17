@@ -20,11 +20,12 @@ import (
 	"context"
 	"fmt"
 
-	pkgv1 "github.com/crossplane/crossplane/apis/v2/pkg/v1"
 	"github.com/docker/docker/api/types/network"
 	"k8s.io/apimachinery/pkg/util/rand"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
+
+	pkgv1 "github.com/crossplane/crossplane/apis/v2/pkg/v1"
 
 	"github.com/crossplane/cli/v2/internal/docker"
 )
