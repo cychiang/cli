@@ -22,6 +22,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/go-containerregistry/pkg/name"
 	"k8s.io/apimachinery/pkg/util/validation"
 
 	"github.com/crossplane/crossplane-runtime/v2/pkg/errors"
@@ -39,8 +40,9 @@ const projectFileName = "crossplane-project.yaml"
 // initCmd initializes a new project.
 type initCmd struct {
 	Name       string `arg:""                                                    help:"The name of the new project."`
-	Directory  string `help:"Directory to initialize. Defaults to project name." short:"d"                                           type:"path"`
-	Repository string `default:"example.com/my-org"                              help:"Override the repository in the project file." optional:"" short:"r"`
+	Directory  string `help:"Directory to initialize. Defaults to project name." short:"d"                                                                               type:"path"`
+	Registry   string `default:"example.com/my-org"                              help:"Override the registry in the project file."                                       optional:"" short:"r"`
+	Repository string `help:"Override the repository name in the project file.  Defaults to the project name." optional:""`
 }
 
 func (c *initCmd) Help() string {
@@ -56,16 +58,24 @@ func (c *initCmd) Run(sp terminal.SpinnerPrinter) error {
 	if c.Directory == "" {
 		c.Directory = c.Name
 	}
-
+	if strings.TrimSpace(c.Repository) == "" {
+		c.Repository = c.Name
+	}
 	// Check if the target directory is suitable.
 	if err := c.checkTargetDirectory(); err != nil {
 		return err
 	}
 
-	repo := strings.TrimRight(strings.TrimSpace(c.Repository), "/")
-	if repo == "" {
-		return errors.New("repository cannot be empty; set --repository to an OCI repository prefix like 'xpkg.crossplane.io/my-org'")
+	rp := strings.TrimRight(strings.TrimSpace(c.Registry), "/")
+	if rp == "" {
+		return errors.New("registry cannot be empty; set --registryPath to an OCI registry prefix like 'xpkg.crossplane.io/my-org'")
 	}
+
+	r, err := name.NewRepository(rp + "/" + c.Repository)
+	if err != nil {
+		return errors.Wrapf(err, "cannot build function reference from repository \"%s/%s\"", rp, c.Repository)
+	}
+
 	return sp.WrapWithSuccessSpinner("Initializing project", func() error {
 		if err := os.MkdirAll(c.Directory, 0o750); err != nil {
 			return errors.Wrapf(err, "failed to create directory %s", c.Directory)
@@ -78,8 +88,8 @@ kind: Project
 metadata:
   name: %s
 spec:
-  repository: %s/%s
-`, c.Name, repo, c.Name)
+  repository: %s
+`, c.Name, r.String())
 
 		if err := os.WriteFile(projFile, []byte(content), 0o600); err != nil {
 			return errors.Wrapf(err, "failed to write %s", projectFileName)
