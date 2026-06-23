@@ -86,6 +86,11 @@ func (c *pushCmd) AfterApply() error {
 
 // Run runs the push cmd.
 func (c *pushCmd) Run(logger logging.Logger) error {
+	anns, err := parseAnnotations(c.OCIAnnotation)
+	if err != nil {
+		return errors.Wrap(err, errParseAnnotations)
+	}
+
 	// If package is not defined, attempt to find single package in current
 	// directory.
 	if len(c.PackageFiles) == 0 {
@@ -126,11 +131,6 @@ func (c *pushCmd) Run(logger logging.Logger) error {
 	options := []remote.Option{
 		remote.WithAuthFromKeychain(authn.DefaultKeychain),
 		remote.WithTransport(t),
-	}
-
-	anns, err := parseAnnotations(c.OCIAnnotation)
-	if err != nil {
-		return errors.Wrap(err, errParseAnnotations)
 	}
 
 	return pushImages(logger, images, c.Package, anns, options...)
