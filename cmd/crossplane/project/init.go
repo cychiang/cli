@@ -39,10 +39,10 @@ const projectFileName = "crossplane-project.yaml"
 
 // initCmd initializes a new project.
 type initCmd struct {
-	Name       string `arg:""                                                    help:"The name of the new project."`
-	Directory  string `help:"Directory to initialize. Defaults to project name." short:"d"                                                                               type:"path"`
-	Registry   string `default:"example.com/my-org"                              help:"Override the registry in the project file."                                       optional:"" short:"r"`
-	Repository string `help:"Override the repository name in the project file.  Defaults to the project name." optional:""`
+	Name       string `arg:""                                                                                 help:"The name of the new project."`
+	Directory  string `help:"Directory to initialize. Defaults to project name"                               short:"d"                                         type:"path"`
+	Registry   string `default:"example.com/my-org"                                                           help:"Override the registry in the project file." optional:"" short:"r"`
+	Repository string `help:"Override the repository name in the project file. Defaults to the project name." optional:""`
 }
 
 func (c *initCmd) Help() string {
@@ -68,12 +68,12 @@ func (c *initCmd) Run(sp terminal.SpinnerPrinter) error {
 
 	rp := strings.TrimRight(strings.TrimSpace(c.Registry), "/")
 	if rp == "" {
-		return errors.New("registry cannot be empty; set --registryPath to an OCI registry prefix like 'xpkg.crossplane.io/my-org'")
+		return errors.New("registry cannot be empty; set --registry to an OCI registry prefix like 'xpkg.crossplane.io/my-org'")
 	}
 
 	r, err := name.NewRepository(rp + "/" + c.Repository)
 	if err != nil {
-		return errors.Wrapf(err, "cannot build function reference from repository \"%s/%s\"", rp, c.Repository)
+		return errors.Wrapf(err, "cannot build repository \"%s/%s\"", rp, c.Repository)
 	}
 
 	return sp.WrapWithSuccessSpinner("Initializing project", func() error {
