@@ -26,7 +26,7 @@ import "k8s.io/client-go/rest"
 // building its client.
 type ImpersonationFlags struct {
 	As      string   `help:"Username to impersonate for the operation. User could be a regular user or a service account in a namespace." name:"as"`
-	AsGroup []string `help:"Group to impersonate for the operation, this flag can be repeated to specify multiple groups."                name:"as-group" sep:"none"`
+	AsGroup []string `help:"Group to impersonate for the operation. Repeat to specify multiple groups."                                   name:"as-group" sep:"none"`
 	AsUID   string   `help:"UID to impersonate for the operation."                                                                        name:"as-uid"`
 }
 
