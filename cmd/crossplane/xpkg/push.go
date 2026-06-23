@@ -45,9 +45,10 @@ import (
 var helpPush string
 
 const (
-	errGetwd           = "failed to get working directory while searching for package"
-	errFindPackageinWd = "failed to find a package in current working directory"
-	errAnnotateLayers  = "failed to propagate xpkg annotations from OCI image config file to image layers"
+	errGetwd            = "failed to get working directory while searching for package"
+	errFindPackageinWd  = "failed to find a package in current working directory"
+	errAnnotateLayers   = "failed to propagate xpkg annotations from OCI image config file to image layers"
+	errParseAnnotations = "failed to parse annotations"
 
 	errFmtNewTag        = "failed to parse package tag %q"
 	errFmtReadPackage   = "failed to read package file %s"
@@ -65,8 +66,9 @@ type pushCmd struct {
 	Package string `arg:"" help:"Where to push the package. Must be a fully qualified OCI tag, including the registry, repository, and tag." placeholder:"REGISTRY/REPOSITORY:TAG"`
 
 	// Flags. Keep sorted alphabetically.
+	OCIAnnotation         []string `help:"An OCI manifest annotation to add to the package in key=value format. Repeatable." name:"oci-annotation" placeholder:"KEY=VALUE" short:"a"`
 	InsecureSkipTLSVerify bool     `help:"[INSECURE] Skip verifying TLS certificates."`
-	PackageFiles          []string `help:"A comma-separated list of xpkg files to push." placeholder:"PATH" predictor:"xpkg_file" short:"f" type:"existingfile"`
+	PackageFiles          []string `help:"A comma-separated list of xpkg files to push."                                     placeholder:"PATH"    predictor:"xpkg_file"   short:"f" type:"existingfile"`
 
 	// Internal state. These aren't part of the user-exposed CLI structure.
 	fs afero.Fs
@@ -84,6 +86,11 @@ func (c *pushCmd) AfterApply() error {
 
 // Run runs the push cmd.
 func (c *pushCmd) Run(logger logging.Logger) error {
+	anns, err := parseAnnotations(c.OCIAnnotation)
+	if err != nil {
+		return errors.Wrap(err, errParseAnnotations)
+	}
+
 	// If package is not defined, attempt to find single package in current
 	// directory.
 	if len(c.PackageFiles) == 0 {
@@ -126,7 +133,7 @@ func (c *pushCmd) Run(logger logging.Logger) error {
 		remote.WithTransport(t),
 	}
 
-	return pushImages(logger, images, c.Package, options...)
+	return pushImages(logger, images, c.Package, anns, options...)
 }
 
 // packageImage describes a package image that will be pushed.
@@ -140,7 +147,7 @@ type packageImage struct {
 }
 
 // pushImages pushes package images to the given URL using the provided options.
-func pushImages(logger logging.Logger, images []packageImage, url string, options ...remote.Option) error {
+func pushImages(logger logging.Logger, images []packageImage, url string, annotations map[string]string, options ...remote.Option) error {
 	if len(options) == 0 {
 		options = []remote.Option{
 			remote.WithAuthFromKeychain(authn.DefaultKeychain),
@@ -160,6 +167,8 @@ func pushImages(logger logging.Logger, images []packageImage, url string, option
 		if err != nil {
 			return errors.Wrapf(err, errAnnotateLayers)
 		}
+
+		img = annotateImage(img, annotations)
 
 		if err := remote.Write(tag, img, options...); err != nil {
 			return errors.Wrapf(err, errFmtPushPackage, pi.Path)
@@ -182,6 +191,8 @@ func pushImages(logger logging.Logger, images []packageImage, url string, option
 			if err != nil {
 				return errors.Wrapf(err, errAnnotateLayers)
 			}
+
+			img = annotateImage(img, annotations)
 
 			d, err := img.Digest()
 			if err != nil {
@@ -230,7 +241,8 @@ func pushImages(logger logging.Logger, images []packageImage, url string, option
 		return err
 	}
 
-	if err := remote.WriteIndex(tag, mutate.AppendManifests(empty.Index, adds...), options...); err != nil {
+	idx := annotateIndex(mutate.AppendManifests(empty.Index, adds...), annotations)
+	if err := remote.WriteIndex(tag, idx, options...); err != nil {
 		return errors.Wrapf(err, errFmtWriteIndex, len(adds))
 	}
 
