@@ -188,9 +188,24 @@ func TestCmdRun(t *testing.T) {
 				cmd: Cmd{
 					Operation:         "operation.yaml",
 					Functions:         "functions.yaml",
-					RequiredResources: "missing.yaml",
+					RequiredResources: []string{"missing.yaml"},
 					Timeout:           time.Minute,
 					fs:                newTestFS(nil),
+				},
+			},
+			want: want{err: cmpopts.AnyError},
+		},
+		"MultipleRequiredResourcesFirstMissing": {
+			reason: "An error loading the first of multiple --required-resources files should propagate, not be silently dropped.",
+			args: args{
+				cmd: Cmd{
+					Operation:         "operation.yaml",
+					Functions:         "functions.yaml",
+					RequiredResources: []string{"missing.yaml", "resources-b.yaml"},
+					Timeout:           time.Minute,
+					fs: newTestFS(map[string]string{
+						"resources-b.yaml": "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: resource-b\n",
+					}),
 				},
 			},
 			want: want{err: cmpopts.AnyError},

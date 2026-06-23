@@ -73,17 +73,17 @@ type Cmd struct {
 	Functions         string `arg:"" help:"A YAML file or directory of YAML files specifying the Composition Functions to use to render the XR. Optional when running in a project." optional:""           predictor:"yaml_file_or_directory" type:"path"`
 
 	// Flags. Keep them in alphabetical order.
-	ContextFiles           map[string]string `help:"Comma-separated context key-value pairs to pass to the Function pipeline. Values must be files containing JSON/YAML."                           mapsep:""               predictor:"file"`
-	ContextValues          map[string]string `help:"Comma-separated context key-value pairs to pass to the Function pipeline. Values must be JSON/YAML. Keys take precedence over --context-files." mapsep:""`
-	IncludeFunctionResults bool              `help:"Include informational and warning messages from Functions in the rendered output as resources of kind: Result."                                 short:"r"`
-	IncludeFullXR          bool              `help:"Include a direct copy of the input XR's spec and metadata fields in the rendered output."                                                       short:"x"`
-	ObservedResources      string            `help:"A YAML file or directory of YAML files specifying the observed state of composed resources."                                                    placeholder:"PATH"      predictor:"yaml_file_or_directory" short:"o"   type:"path"`
-	ExtraResources         string            `help:"A YAML file or directory of YAML files specifying required resources (deprecated, use --required-resources)."                                   placeholder:"PATH"      predictor:"yaml_file_or_directory" type:"path"`
-	RequiredResources      string            `help:"A YAML file or directory of YAML files specifying required resources to pass to the Function pipeline."                                         placeholder:"PATH"      predictor:"yaml_file_or_directory" short:"e"   type:"path"`
-	RequiredSchemas        string            `help:"A directory of JSON files specifying OpenAPI v3 schemas (from kubectl get --raw /openapi/v3/<group-version>)."                                  placeholder:"DIR"       predictor:"directory"              short:"s"   type:"path"`
-	IncludeContext         bool              `help:"Include the context in the rendered output as a resource of kind: Context."                                                                     short:"c"`
-	FunctionCredentials    string            `help:"A YAML file or directory of YAML files specifying credentials to use for Functions to render the XR."                                           placeholder:"PATH"      predictor:"yaml_file_or_directory" type:"path"`
-	FunctionAnnotations    []string          `help:"Override function annotations for all functions. Provide multiple annotations by repeating the argument."                                       placeholder:"KEY=VALUE" short:"a"`
+	ContextFiles           map[string]string `help:"Comma-separated context key-value pairs to pass to the Function pipeline. Values must be files containing JSON/YAML."                                           mapsep:""               predictor:"file"`
+	ContextValues          map[string]string `help:"Comma-separated context key-value pairs to pass to the Function pipeline. Values must be JSON/YAML. Keys take precedence over --context-files."                 mapsep:""`
+	IncludeFunctionResults bool              `help:"Include informational and warning messages from Functions in the rendered output as resources of kind: Result."                                                 short:"r"`
+	IncludeFullXR          bool              `help:"Include a direct copy of the input XR's spec and metadata fields in the rendered output."                                                                       short:"x"`
+	ObservedResources      string            `help:"A YAML file or directory of YAML files specifying the observed state of composed resources."                                                                    placeholder:"PATH"      predictor:"yaml_file_or_directory" short:"o"   type:"path"`
+	ExtraResources         []string          `help:"A YAML file or directory of YAML files specifying required resources (deprecated, use --required-resources). Provide multiple files by repeating the argument." placeholder:"PATH"      predictor:"yaml_file_or_directory" type:"path"`
+	RequiredResources      []string          `help:"A YAML file or directory of YAML files specifying required resources to pass to the Function pipeline. Provide multiple files by repeating the argument."       placeholder:"PATH"      predictor:"yaml_file_or_directory" short:"e"   type:"path"`
+	RequiredSchemas        string            `help:"A directory of JSON files specifying OpenAPI v3 schemas (from kubectl get --raw /openapi/v3/<group-version>)."                                                  placeholder:"DIR"       predictor:"directory"              short:"s"   type:"path"`
+	IncludeContext         bool              `help:"Include the context in the rendered output as a resource of kind: Context."                                                                                     short:"c"`
+	FunctionCredentials    string            `help:"A YAML file or directory of YAML files specifying credentials to use for Functions to render the XR."                                                           placeholder:"PATH"      predictor:"yaml_file_or_directory" type:"path"`
+	FunctionAnnotations    []string          `help:"Override function annotations for all functions. Provide multiple annotations by repeating the argument."                                                       placeholder:"KEY=VALUE" short:"a"`
 
 	CacheDir       string        `env:"CROSSPLANE_XPKG_CACHE"                                                                                      help:"Directory for cached xpkg package contents."          name:"cache-dir"`
 	MaxConcurrency uint          `default:"8"                                                                                                      help:"Maximum concurrency for building embedded functions."`
@@ -202,21 +202,20 @@ func (c *Cmd) Run(k *kong.Context, log logging.Logger, sp terminal.SpinnerPrinte
 	}
 
 	rrs := []unstructured.Unstructured{}
-	if c.RequiredResources != "" {
-		rrs, err = render.LoadRequiredResources(c.fs, c.RequiredResources)
+	for _, path := range c.RequiredResources {
+		loaded, err := render.LoadRequiredResources(c.fs, path)
 		if err != nil {
-			return errors.Wrapf(err, "cannot load required resources from %q", c.RequiredResources)
+			return errors.Wrapf(err, "cannot load required resources from %q", path)
 		}
+		rrs = append(rrs, loaded...)
 	}
 
-	if c.ExtraResources != "" {
-		ers, err := render.LoadRequiredResources(c.fs, c.ExtraResources)
+	for _, path := range c.ExtraResources {
+		loaded, err := render.LoadRequiredResources(c.fs, path)
 		if err != nil {
-			return errors.Wrapf(err, "cannot load extra resources from %q", c.ExtraResources)
+			return errors.Wrapf(err, "cannot load extra resources from %q", path)
 		}
-
-		// Merge extra resources into required resources.
-		rrs = append(rrs, ers...)
+		rrs = append(rrs, loaded...)
 	}
 
 	// Load required schemas
