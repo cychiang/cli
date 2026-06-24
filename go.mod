@@ -12,8 +12,8 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/x/term v0.2.2
 	github.com/containerd/errdefs v1.0.0
-	github.com/crossplane/crossplane-runtime/v2 v2.4.0-rc.0
-	github.com/crossplane/crossplane/apis/v2 v2.4.0-rc.0
+	github.com/crossplane/crossplane-runtime/v2 v2.3.3
+	github.com/crossplane/crossplane/apis/v2 v2.3.3
 	github.com/crossplane/function-sdk-go v0.7.1
 	github.com/docker/cli v29.5.3+incompatible
 	github.com/docker/docker v28.5.2+incompatible
@@ -182,7 +182,7 @@ require (
 	github.com/google/cel-go v0.28.0 // indirect
 	github.com/google/certificate-transparency-go v1.3.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
-	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20230919002926-dbcd01c402b2 // indirect
+	github.com/google/go-containerregistry/pkg/authn/k8schain v0.0.0-20260312205200-e9163014982e // indirect
 	github.com/google/go-containerregistry/pkg/authn/kubernetes v0.0.0-20250225234217-098045d5e61f // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/css v1.0.1 // indirect
